@@ -309,14 +309,24 @@ thay đổi Context Recall hay không.
 4. Rerank cùng tập chunks, không thêm hoặc xóa chunk.
 5. Tính lại hai metrics và giải thích kết quả.
 
+Reranker dùng `rerank_by_overlap(contexts, query)` với `query` là **question**,
+đúng như thông tin có sẵn tại thời điểm inference. Không dùng `expected_answer`
+làm query, vì gold answer không tồn tại lúc chạy thật và sẽ gây data leakage
+(oracle rerank sẽ đẩy Precision after lên 1.000 ở cả 5 case — một con số đẹp
+nhưng không tái lập được trong production).
+
 | ID | Recall before | Recall after | Precision before | Precision after | Delta Precision |
 |---|---:|---:|---:|---:|---:|
-| E03 | 1.000 | 1.000 | 0.806 | 1.000 | +0.194 |
-| M05 | 0.941 | 0.941 | 0.887 | 1.000 | +0.113 |
+| E03 | 1.000 | 1.000 | 0.806 | 0.917 | +0.111 |
+| M05 | 0.941 | 0.941 | 0.887 | 0.950 | +0.062 |
 | H01 | 0.842 | 0.842 | 1.000 | 1.000 | +0.000 |
 | H05 | 0.789 | 0.789 | 1.000 | 1.000 | +0.000 |
-| A03 | 1.000 | 1.000 | 0.679 | 1.000 | +0.321 |
-| **Avg** | **0.914** | **0.914** | **0.874** | **1.000** | **+0.126** |
+| A03 | 1.000 | 1.000 | 0.679 | 0.804 | +0.125 |
+| **Avg** | **0.914** | **0.914** | **0.874** | **0.934** | **+0.060** |
+
+H01 và H05 có Delta = 0 vì chunk relevant vốn đã nằm ở top đầu, rerank không còn
+gì để cải thiện; đúng như kỳ vọng, Precision chỉ tăng ở các case ban đầu bị xếp
+hạng lệch (E03, M05, A03).
 
 **Tại sao Recall dự kiến không đổi?**
 

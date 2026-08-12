@@ -18,7 +18,7 @@ answer/context trace trong `artifacts/actual_answers.json` trước khi kết lu
 | Faithfulness | 0.627 | 0.067 | 1.000 | Kém, bị rớt thảm hại ở các câu hỏi đánh đố (Adversarial). |
 | Relevance | 0.730 | 0.333 | 1.000 | Tạm ổn, đôi lúc sinh câu trả lời bị dông dài. |
 | Completeness | 0.779 | 0.100 | 1.000 | Tốt, đa số các câu đều đủ ý. |
-| Overall Score | 0.730 | 0.167 | 0.933 | Bị kéo xuống bởi Faithfulness. |
+| Overall Score | 0.712 | 0.167 | 0.933 | Bị kéo xuống bởi Faithfulness. |
 
 **Score interpretation**
 
