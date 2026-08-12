@@ -30,11 +30,11 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness | | | |
-| Answer Relevance | | | |
-| Context Recall | | | |
-| Context Precision | | | |
-| Completeness | | | |
+| Faithfulness | Câu hỏi yêu cầu từ chối (adversarial out-of-scope) hoặc model trả lời đúng nhờ zero-shot knowledge dù context thiếu (vẫn không faithful với context nhưng đúng thực tế). | Sinh ra thông tin sai lệch (hallucination) hoặc trực tiếp mâu thuẫn với context, đặc biệt là các thông tin quan trọng như deadline, học phí. | Cải thiện prompt để model bám sát context (grounding). Nếu thiếu thông tin ở context, cải thiện retrieval. |
+| Answer Relevance | Câu hỏi chung chung, model trả lời một cách bao quát, có chứa thông tin thừa so với core intent nhưng không sai. | Câu trả lời đi lạc đề hoàn toàn, trả lời một câu hỏi khác hoặc cung cấp thông tin không giải quyết được vấn đề của user. | Tinh chỉnh system prompt để tập trung trả lời đúng trọng tâm. Phân tích lỗi phân loại intent. |
+| Context Recall | Một chunk duy nhất đã đủ trả lời trọn vẹn câu hỏi, nhưng hệ thống tính điểm dựa trên nhiều chunks (union), làm coverage bị thấp giả tạo. | Retriever bỏ sót hoàn toàn tài liệu/chunk quan trọng nhất chứa đáp án, khiến model không thể trả lời hoặc phải hallucinate. | Cải thiện embedding model, tinh chỉnh chunking strategy (kích thước, overlap) hoặc áp dụng hybrid search. |
+| Context Precision | Chunk quan trọng bị xếp hạng thấp (ví dụ top 4, 5) nhưng context window vẫn đủ lớn để LLM đọc và trả lời đúng. | Các chunks không liên quan chiếm hết các vị trí top đầu, đẩy chunk quan trọng ra khỏi context window hoặc làm LLM bối rối. | Áp dụng hoặc tinh chỉnh mô hình Reranking (ví dụ: Cross-Encoder) để đẩy relevant chunks lên vị trí cao nhất. |
+| Completeness | Câu trả lời chính xác, đi thẳng vào vấn đề nhưng bỏ qua một vài chi tiết nhỏ không mang tính quyết định có trong gold answer. | Câu trả lời bỏ sót các điều kiện bắt buộc (conditions), ngoại lệ (exceptions) hoặc các bước quan trọng dẫn đến user hành động sai. | Cập nhật prompt yêu cầu liệt kê rõ các điều kiện/ngoại lệ, hoặc tối ưu context recall nếu thông tin đó không được retrieve. |
 
 ### Exercise 1.2 — Bias trong LLM-as-a-Judge
 
@@ -47,14 +47,25 @@ Ba bias thường gặp:
 **Câu 1: Thiết kế experiment phát hiện position bias với ít nhất hai conditions.**
 
 > *Câu trả lời:*
+> Condition 1 (Forward): Cung cấp cho LLM Judge hai câu trả lời, Answer A ở vị trí 1 và Answer B ở vị trí 2. Ghi nhận kết quả (A hay B thắng).
+> Condition 2 (Swap): Đảo ngược vị trí, Answer B ở vị trí 1 và Answer A ở vị trí 2. Ghi nhận kết quả.
+> Nếu LLM Judge có order bias, nó sẽ có xu hướng luôn chọn answer ở vị trí 1 (hoặc luôn chọn vị trí 2) bất kể nội dung, dẫn đến kết quả mâu thuẫn giữa hai conditions. Tỉ lệ không nhất quán (inconsistency rate) chính là mức độ position bias.
 
 **Câu 2: Làm thế nào giảm verbosity bias bằng rubric design?**
 
 > *Câu trả lời:*
+> Thiết kế rubric tập trung vào "mật độ thông tin" (information density) thay vì độ dài.
+> - Định nghĩa rõ: "Một câu trả lời ngắn gọn, đi thẳng vào vấn đề phải được điểm cao hơn một câu dài dòng nhưng chứa cùng lượng thông tin cốt lõi".
+> - Thêm tiêu chí phạt (penalty) cho thông tin thừa thãi (fluff) hoặc không liên quan.
+> - Hạn chế yêu cầu giải thích trừ khi cần thiết, vì giải thích dễ làm model ưu tiên câu trả lời dài.
 
 **Câu 3: Tại sao cần calibrate LLM judge với human labels?**
 
 > *Câu trả lời:*
+> LLM Judge không phải lúc nào cũng hiểu đúng ngữ cảnh, sắc thái của domain cụ thể, và có thể mang các biases riêng. Calibrate với human labels (bằng cách tính độ tương quan - correlation, agreement rate) giúp:
+> 1. Đảm bảo LLM đánh giá đúng định nghĩa về "chất lượng" của con người.
+> 2. Phát hiện và điều chỉnh các bias (strictness, verbosity).
+> 3. Tìm ra threshold phù hợp để tin tưởng giao phó cho LLM Judge chạy tự động trong CI/CD.
 
 ### Exercise 1.3 — Evaluation trong CI/CD
 
@@ -62,13 +73,16 @@ Ba bias thường gặp:
 
 | Metric | Threshold | Lý do |
 |---|---:|---|
-| Faithfulness | | |
-| Answer Relevance | | |
-| Completeness | | |
+| Faithfulness | 0.90 | Hallucination là rủi ro lớn nhất (đặc biệt trong student services với các thông tin nhạy cảm như học phí, deadline). Cần strict threshold để chặn thông tin sai. |
+| Answer Relevance | 0.75 | Có thể linh hoạt hơn vì câu trả lời chứa thông tin thừa có thể bị giảm điểm relevance nhưng không gây hại nghiêm trọng như unfaithful. |
+| Completeness | 0.85 | Cần đảm bảo sinh viên nhận đủ các điều kiện/ngoại lệ quan trọng, nhưng có thể chấp nhận thiếu một số chi tiết phụ. |
 
 **Câu 2: Khi nào dùng offline evaluation, online evaluation và human review?**
 
 > *Câu trả lời:*
+> - **Offline evaluation:** Dùng trong CI/CD pipeline, trước khi deploy (development phase). Chạy LLM Judge tự động trên các golden datasets để chống regression và so sánh các phiên bản prompts/models.
+> - **Online evaluation:** Dùng sau khi đã deploy (production). Theo dõi user feedback (explicit như thumbs up/down, implicit như click rate), và có thể chạy LLM Judge trên một sample traffic thật để monitor chất lượng realtime (shadow metrics).
+> - **Human review:** Dùng để tạo golden dataset ban đầu, định kỳ calibrate lại LLM Judge, và để xử lý các edge cases phức tạp/high-risk mà tự động hóa không thể đánh giá chính xác.
 
 ---
 
@@ -124,6 +138,7 @@ Full pipeline:
 - `generate_improvement_log(failures, suggestions)`
 
 Kiểm tra:
+
 
 ```bash
 pytest tests/ -v
@@ -331,3 +346,4 @@ Hoàn thành kiểm tra cuối trong khoảng 11:50–12:00.
 - [ ] `reflection.md` có ba failure analyses và regression strategy.
 - [ ] Đã copy `template.py` thành `solution/solution.py`.
 - [ ] Exercise 3.4 và 3.5 chỉ làm nếu chọn bonus.
+
