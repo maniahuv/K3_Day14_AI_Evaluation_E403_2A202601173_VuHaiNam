@@ -284,19 +284,19 @@ verbosity bias và self-preference bằng cách nào?
 Chỉ làm sau khi hoàn thành 3.1–3.3. Chọn hai framework trong RAGAS, DeepEval
 và TruLens; chạy hoặc thiết kế một so sánh có cùng input dataset.
 
-| Tiêu chí | Framework 1: ____ | Framework 2: ____ |
+| Tiêu chí | Framework 1: RAGAS | Framework 2: DeepEval |
 |---|---|---|
-| Setup complexity | | |
-| Metrics available | | |
-| CI/CD integration | | |
-| Kết quả trên cùng dataset | | |
-| Insight rút ra | | |
+| Setup complexity | Tương đối dễ setup thông qua Python SDK, thường chỉ cần cung cấp OpenAI API key. | Hơi phức tạp hơn nhưng rất có hệ thống, setup theo chuẩn Pytest (Test-Driven). |
+| Metrics available | Chủ yếu tập trung vào các metrics cho RAG (Faithfulness, Answer Relevance, Context Recall/Precision). | Đa dạng hơn RAGAS: ngoài RAG metrics còn có Hallucination, Toxicity, Bias, G-Eval, Summarization. |
+| CI/CD integration | Hỗ trợ CI/CD ở mức cơ bản (cần tự viết script để wrap logic chấm điểm). | Rất mạnh mẽ với CI/CD, hoạt động như một Pytest plugin và tự động sinh report test dễ đọc. |
+| Kết quả trên cùng dataset | Điểm số aggregated khá tương đồng, dễ dàng đánh giá xu hướng chung. | Thường chấm strict hơn, đi sâu vào logic pass/fail cho từng test case hơn là chỉ tính trung bình. |
+| Insight rút ra | Phù hợp để làm prototyping nhanh hoặc đánh giá tổng thể hệ thống RAG trên một tệp dữ liệu lớn. | Rất phù hợp cho môi trường production, giúp phát triển theo hướng TDD và bắt lỗi chặt chẽ hơn. |
 
-- Scores có nhất quán không?
-- Framework nào strict hơn và vì sao?
-- Hai framework có tìm ra cùng failure cases không?
+- Scores có nhất quán không? Có, cả hai framework đều chỉ ra được điểm yếu của mô hình nằm ở vấn đề Hallucination khi gặp câu hỏi Adversarial.
+- Framework nào strict hơn và vì sao? DeepEval strict hơn do nó sử dụng cơ chế ngưỡng (thresholds) rõ ràng và cấu trúc G-Eval yêu cầu LLM đưa ra reason (lý do) trước khi chấm rớt một case.
+- Hai framework có tìm ra cùng failure cases không? Có, chúng đều sẽ phát hiện ra các case A01, A02, A03 bị fail ở metric Faithfulness/Hallucination.
 
-> *Phân tích:*
+> *Phân tích:* Mặc dù RAGAS mang lại sự tiện lợi và nhẹ nhàng trong việc đánh giá nhanh RAG Pipeline, DeepEval lại tỏ ra vượt trội hơn khi ứng dụng vào môi trường production và quy trình phát triển chuyên nghiệp (CI/CD). DeepEval cung cấp bức tranh chi tiết và nghiêm ngặt hơn nhờ vào cơ chế Test-Driven, nhưng đổi lại sẽ đòi hỏi thời gian làm quen và setup hệ thống nhiều hơn.
 
 ### Exercise 3.5 — Retrieval Reranking (Bonus +5)
 
@@ -311,20 +311,20 @@ thay đổi Context Recall hay không.
 
 | ID | Recall before | Recall after | Precision before | Precision after | Delta Precision |
 |---|---:|---:|---:|---:|---:|
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| **Avg** | | | | | |
+| E03 | 1.000 | 1.000 | 0.806 | 1.000 | +0.194 |
+| M05 | 0.941 | 0.941 | 0.887 | 1.000 | +0.113 |
+| H01 | 0.842 | 0.842 | 1.000 | 1.000 | +0.000 |
+| H05 | 0.789 | 0.789 | 1.000 | 1.000 | +0.000 |
+| A03 | 1.000 | 1.000 | 0.679 | 1.000 | +0.321 |
+| **Avg** | **0.914** | **0.914** | **0.874** | **1.000** | **+0.126** |
 
 **Tại sao Recall dự kiến không đổi?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Bởi vì reranking chỉ đơn thuần là việc thay đổi và sắp xếp lại **thứ tự** (order) của các chunks đã được truy xuất (retrieved), chứ không hề thêm mới hay bớt đi bất kỳ chunk nào trong tập hợp kết quả ban đầu. Recall là tỷ lệ tập trung vào việc "lấy đủ", do tập chunks không đổi nên số lượng chunks liên quan vẫn nằm y nguyên đó, dẫn đến Recall không đổi.
 
 **Khi nào reranking không đủ và cần sửa retriever/query/chunking?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Reranking sẽ vô dụng nếu tài liệu thực sự liên quan không lọt được vào top-K kết quả ban đầu (tức là Context Recall thấp ngay từ đầu). Trong trường hợp đó, ta phải quay lại sửa Retriever (ví dụ đổi thuật toán sang vector + BM25 thay vì chỉ một), sửa query (qua query expansion, rewriting) hoặc xem lại cách chia chunk (chunking strategy) để nội dung không bị vỡ đoạn, mất ngữ cảnh.
 
 ---
 
